@@ -1,0 +1,264 @@
+?nodes: node+
+node: header body
+
+// header
+header: header_param+ _END_HEADER
+header_param: header_param_name _HEARER_SEPARATOR header_param_value _NL
+header_param_name: NORMALIZED_NAME
+header_param_value: INT | FLOAT | STRING | BOOLEAN | POSITION
+
+// body
+body: branch _END_BODY
+
+branch: line+
+?sub_branch: _INDENT branch _DEDENT
+
+line: commands | messages options? | control_flow | comment
+?commands: jump_command | wait_command | status_sending_command | reaction_command | var_command | back_to_flow_command
+?messages: text_message | video_message | photo_message | video_note_message | voice_message
+?control_flow: condition_block
+?comment: _COMMENT _NL
+
+// messages
+speaker: (text|tag|inline_var|escaped_char)* _SPEAKER_SEPARATOR
+
+text_message: speaker? formated_text line_ident? _COMMENT? _NL
+video_message: speaker? _OPEN_TAG_BRACKET _VIDEO_TAG_OPEN media "/" _CLOSE_TAG_BRACKET formated_text? line_ident? _COMMENT? _NL
+photo_message: speaker? _OPEN_TAG_BRACKET _PHOTO_TAG_OPEN media "/" _CLOSE_TAG_BRACKET formated_text? line_ident? _COMMENT? _NL
+video_note_message: speaker? _OPEN_TAG_BRACKET _VIDEO_NOTE_TAG_OPEN media "/" _CLOSE_TAG_BRACKET line_ident? _COMMENT? _NL
+voice_message: speaker? _OPEN_TAG_BRACKET _VOICE_TAG_OPEN media "/" _CLOSE_TAG_BRACKET formated_text? line_ident? _COMMENT? _NL
+
+// commands
+jump_command: _OPEN_COMMAND_BRACKET _JUMP_COMMAND node_name _CLOSE_COMMAND_BRACKET _COMMENT? _NL
+wait_command: _OPEN_COMMAND_BRACKET _WAIT_COMMAND seconds _CLOSE_COMMAND_BRACKET _COMMENT? _NL
+back_to_flow_command: _OPEN_COMMAND_BRACKET _BACK_TO_FLOW_COMMAND _CLOSE_COMMAND_BRACKET _COMMENT? _NL
+status_sending_command: _OPEN_COMMAND_BRACKET (typing | upload_photo | record_voice | record_video_note) seconds _CLOSE_COMMAND_BRACKET _COMMENT? _NL
+reaction_command: _OPEN_COMMAND_BRACKET _REACTION_COMMAND reaction _CLOSE_COMMAND_BRACKET  _COMMENT? _NL
+var_command: _OPEN_COMMAND_BRACKET (set_var | declare_var) _CLOSE_COMMAND_BRACKET  _COMMENT? _NL
+
+// status sending command elemenst
+typing: _TYPING_COMMAND
+upload_photo: _UPLOAD_PHOTO_COMMAND
+record_voice: _RECORD_VOICE_COMMAND
+record_video_note: _RECORD_VIDEO_NOTE_COMMAND
+?var_name: common_var_name | node_var_name
+common_var_name: VAR_NAME
+node_var_name: NODE_VAR_NAME
+
+// var command elements
+set_var: _SET_COMMAND var_name "=" (value|calculate)
+declare_var: _DECLARE_COMMAND var_name "=" (value|calculate)
+value.2: string | boolean | number
+calculate: expression
+
+// message elements
+formated_text: (text|tag|inline_var|escaped_char)+
+inline_var: _OPEN_INTEXT_VAR_BRACKET var_name _CLOSE_INTEXT_VAR_BRACKET
+escaped_char: _ESC_SYMBOL ANY_CHAR
+text: TEXT
+media: FILE_NAME
+node_name: NORMALIZED_NAME
+reaction: NORMALIZED_NAME
+seconds: FLOAT | INT
+
+// tags
+tag: line_break_tag  
+    | open_link_tag 
+    | close_link_tag 
+    | colon_tag 
+    | usd_tag
+    | open_bold_tag 
+    | close_bold_tag
+    | open_underline_tag
+    | close_underline_tag
+    | open_strike_tag
+    | close_strike_tag
+    | open_italic_tag
+    | close_italic_tag
+    | open_spoiler_tag
+    | close_spoiler_tag
+    | open_monospace_tag
+    | close_monospace_tag
+    | close_all_tags
+line_break_tag: _TAG_LINE_BREAK
+colon_tag: _TAG_COLON
+usd_tag: _TAG_USD
+
+open_link_tag: _OPEN_TAG_BRACKET _TAG_LINK_OPEN url _CLOSE_TAG_BRACKET
+close_link_tag: _OPEN_TAG_BRACKET "/" _TAG_LINK _CLOSE_TAG_BRACKET
+url: LINK | "\"" LINK "\"" | var_name
+
+character_tag: _OPEN_TAG_BRACKET _TAG_TEXT_OPEN ANY_CHARACTER "/" _CLOSE_TAG_BRACKET
+
+open_bold_tag: _OPEN_TAG_BRACKET _TAG_BOLD _CLOSE_TAG_BRACKET
+close_bold_tag: _OPEN_TAG_BRACKET "/" _TAG_BOLD _CLOSE_TAG_BRACKET
+open_underline_tag: _OPEN_TAG_BRACKET _TAG_UNDERLINE _CLOSE_TAG_BRACKET
+close_underline_tag: _OPEN_TAG_BRACKET "/" _TAG_UNDERLINE _CLOSE_TAG_BRACKET
+open_strike_tag: _OPEN_TAG_BRACKET _TAG_STRIKE _CLOSE_TAG_BRACKET
+close_strike_tag: _OPEN_TAG_BRACKET "/" _TAG_STRIKE _CLOSE_TAG_BRACKET
+open_italic_tag: _OPEN_TAG_BRACKET _TAG_ITALIC _CLOSE_TAG_BRACKET
+close_italic_tag: _OPEN_TAG_BRACKET "/" _TAG_ITALIC _CLOSE_TAG_BRACKET
+open_spoiler_tag: _OPEN_TAG_BRACKET _TAG_SPOILER _CLOSE_TAG_BRACKET
+close_spoiler_tag: _OPEN_TAG_BRACKET "/" _TAG_SPOILER _CLOSE_TAG_BRACKET
+open_monospace_tag: _OPEN_TAG_BRACKET _TAG_MONOSPACE _CLOSE_TAG_BRACKET
+close_monospace_tag: _OPEN_TAG_BRACKET "/" _TAG_MONOSPACE _CLOSE_TAG_BRACKET
+close_all_tags: _OPEN_TAG_BRACKET "/" _CLOSE_TAG_BRACKET
+
+
+// options
+options: option+
+option: _OPTION_START formated_text if_statement? line_ident? _COMMENT? _NL sub_branch?
+
+// expressions
+?expression: term
+    | expression "+" term   -> add
+    | expression "-" term   -> subtract
+
+?term: factor
+    | 
+    | term "*" factor -> multiply
+    | term "/" factor -> divide
+    | term "%" factor -> modulo
+
+?factor: number
+        | var_name
+        
+        | "(" expression ")"
+
+number: INT | FLOAT
+string: STRING
+boolean: BOOLEAN
+
+// conditions
+condition_block: if_block elif_block* else_block? _OPEN_COMMAND_BRACKET _ENDIF_COMMAND _CLOSE_COMMAND_BRACKET _COMMENT? _NL
+if_block: if_statement  _NL sub_branch?
+elif_block: elif_statement _NL sub_branch?
+else_block: else_statement _NL sub_branch?
+
+// condition elements
+
+if_statement: _OPEN_COMMAND_BRACKET _IF_COMMAND conditions _CLOSE_COMMAND_BRACKET _COMMENT? -> conditions
+elif_statement: _OPEN_COMMAND_BRACKET _ELIF_COMMAND conditions _CLOSE_COMMAND_BRACKET _COMMENT? -> conditions
+else_statement: _OPEN_COMMAND_BRACKET _ELSE_COMMAND _CLOSE_COMMAND_BRACKET _COMMENT?
+
+?conditions: condition
+        | condition _AND_OP conditions -> and_op
+        | condition _OR_OP conditions -> or_op
+        | condition _XOR_OP conditions -> xor_op
+        | _NOT_OP conditions -> not_op
+
+
+
+?condition: (value|calculate) _EQ_OP (value|calculate)  -> eq
+        | (value|calculate) _NE_OP (value|calculate)  -> ne
+        | (value|calculate) _LT_OP (value|calculate)   -> lt
+        | (value|calculate) _LE_OP (value|calculate)  -> le
+        | (value|calculate) _GT_OP (value|calculate)   -> gt
+        | (value|calculate) _GE_OP (value|calculate)  -> ge
+        | (value|calculate)
+
+//idents
+line_ident: _LINE_VAR_IDENT_MARKER IDENT
+
+// DICT
+// text
+_SPEAKER_SEPARATOR: ":"
+_HEARER_SEPARATOR: ":"
+TEXT: /[^$\[\]\r\n\t{}<>\/#\\]+/
+NORMALIZED_NAME: /\w+/
+NODE_VAR_NAME: /\$__\w+/
+ANY_CHAR:  /./
+_ESC_SYMBOL: "\\"
+
+
+// vars
+INT.50: /-?\d+/
+FLOAT.100: /-?\d+\.\d+/
+STRING: /".*?"/ | /\w[\w\.,: ]*/
+BOOLEAN.10: /true|false/
+POSITION.500: /-?\d+,\s*-?\d+/
+LINK: /[\w:\/\.\-%]+/
+VAR_NAME: /\$\w+/
+FILE_NAME: /[\w\.]+/
+NODE_NAME: /\w+/
+ANY_CHARACTER: /./
+
+// tags
+_OPEN_TAG_BRACKET: "["
+_CLOSE_TAG_BRACKET: "]"
+
+_TAG_LINE_BREAK: _OPEN_TAG_BRACKET /\s*br\s*\// _CLOSE_TAG_BRACKET
+_TAG_COLON: _OPEN_TAG_BRACKET /\s*cl\s*\// _CLOSE_TAG_BRACKET
+_TAG_USD: _OPEN_TAG_BRACKET /\s*usd\s*\// _CLOSE_TAG_BRACKET
+_TAG_LINK: "link"
+_TAG_LINK_OPEN: _TAG_LINK | _TAG_LINK "=" | _TAG_LINK _TAG_LINK "="
+_TAG_BOLD: "b"
+_TAG_UNDERLINE: "u"
+_TAG_STRIKE: "s"
+_TAG_ITALIC: "i"
+_TAG_SPOILER: "spoiler"
+_TAG_MONOSPACE: "ms"
+_TAG_TEXT_OPEN: "ch" | "ch" "=" | "ch" "ch" "="
+
+
+// message types
+_VIDEO_TAG: "video"
+_VIDEO_TAG_OPEN: _VIDEO_TAG | _VIDEO_TAG "=" | _VIDEO_TAG _VIDEO_TAG "="
+_PHOTO_TAG: "photo"
+_PHOTO_TAG_OPEN: _PHOTO_TAG | _PHOTO_TAG "=" | _PHOTO_TAG _PHOTO_TAG "="
+_VIDEO_NOTE_TAG: "video_note"
+_VIDEO_NOTE_TAG_OPEN: _VIDEO_NOTE_TAG | _VIDEO_NOTE_TAG "=" | _VIDEO_NOTE_TAG _VIDEO_NOTE_TAG "="
+_VOICE_TAG: "voice"
+_VOICE_TAG_OPEN: _VOICE_TAG | _VOICE_TAG "=" | _VOICE_TAG _VOICE_TAG "="
+
+// Commands
+
+_JUMP_COMMAND: "jump"
+_WAIT_COMMAND: "wait"
+_TYPING_COMMAND: "typing"
+_UPLOAD_PHOTO_COMMAND: "upload_photo"
+_RECORD_VOICE_COMMAND: "record_voice"
+_RECORD_VIDEO_NOTE_COMMAND: "record_video_note"
+_REACTION_COMMAND: "reaction"
+_SET_COMMAND: "set"
+_DECLARE_COMMAND: "declare"
+_BACK_TO_FLOW_COMMAND: "back_to_flow"
+
+// Intext Var
+_OPEN_INTEXT_VAR_BRACKET: "{"
+_CLOSE_INTEXT_VAR_BRACKET: "}"
+
+// Condition block
+_IF_COMMAND: "if"
+_ELIF_COMMAND: "elseif"
+_ELSE_COMMAND: "else"
+_ENDIF_COMMAND: "endif"
+
+_NOT_OP.100: "not"
+_EQ_OP.100: "=="
+_NE_OP.100: "!="
+_LT_OP.100: "<"
+_LE_OP.100: "<="
+_GT_OP.100: ">"
+_GE_OP.100: ">="
+_AND_OP.100: "and"
+_OR_OP.100: "or"
+_XOR_OP.100: "xor"
+
+//line ident
+_STRING_VAR_IDENT_MARKER.500: /\/\/#\s*string_ident:\s*/
+_LINE_VAR_IDENT_MARKER.500: /#\s*line:\s*/
+IDENT: /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/
+
+_END_HEADER.100: "---" _NL
+_END_BODY.100: "===" _NL*
+_OPTION_START.100: "->"
+_COMMENT.100: /\/\/.*/
+_OPEN_COMMAND_BRACKET.100: "<<"
+_CLOSE_COMMAND_BRACKET.100: ">>"
+
+%import common.WS_INLINE
+%declare _INDENT _DEDENT
+%ignore WS_INLINE
+// %ignore _COMMENT
+_NL: /(\r?\n[\t ]*)+/

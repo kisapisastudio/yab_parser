@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "yab-parser"
+version = "0.1.0"
+description = ""
+authors = ["KisaPisa"]
+readme = "README.md"
+packages = [{include = "yab_parser"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+loguru = "^0.7.2"
+python-dotenv = "^1.0.1"
+pyyaml = "^6.0.1"
+pydantic = "^2.6.1"
+lark = "^1.1.9"
+beautifulsoup4 = "^4.12.3"
+
+
+[tool.poetry.group.dev.dependencies]
+flake8 = "^7.0.0"
+mypy = "^1.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+yarn-to-json = "yab_parser.main:prepare"
