@@ -182,6 +182,12 @@ class Script(BaseModel):
     nodes: dict[str, Node] = {}
 
 
+class ScriptInfo(BaseModel):
+    start_node_name: str
+    all_node_names: list[str]
+    availble_paths: list[list[str]]
+
+
 FlowType = Union[Message, Command, VariableCommand, FlowControl]
 FlowList = dict[str, FlowType]
 LineType = Union[

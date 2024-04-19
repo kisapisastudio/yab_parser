@@ -1,4 +1,5 @@
 from yab_parser import builder, checker, config
+from yab_parser.schemas.script import ScriptInfo
 import os
 import zipfile
 
@@ -36,6 +37,12 @@ def build():
         for file in os.listdir(config.MEDIA_PATH):
             z.write(os.path.join(config.MEDIA_PATH, file), os.path.join('Media', file))
         z.writestr('script.json', script.seriliazed_tg_script.model_dump_json().encode('utf-8'))
+    with open(config.BUILD_INFO_PATH, 'w') as f:
+        f.write(ScriptInfo(
+            start_node_name=script.seriliazed_tg_script.start_node,
+            all_node_names=list(script.seriliazed_tg_script.nodes.keys()),
+            availble_paths=script.paths,
+        ).model_dump_json())
     config.logger.info('Successfully built the project.')
 
 

@@ -30,5 +30,6 @@ TRANSLATION_PATH = 'Translation'
 SETTINGS_PATH = os.path.join('Settings', 'settings.yaml')
 NESSESSARY_PATHS = [STORY_PATH, SETTINGS_PATH]
 BUILD_PATH = 'build.yab'
+BUILD_INFO_PATH = 'build_info.json'
 
 SUPPORTED_LANGUAGES = ['ru', 'en']
