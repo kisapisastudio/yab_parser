@@ -457,7 +457,7 @@ class TgSerializer(Interpreter):
         self._script.flow = branch_serializer._flow
 
     def _get_translation_text(self, children):
-        return {str(child.type).lower(): child.value.strip() for child in children if child.value.strip()}
+        return {str(child.type).lower(): child.value.strip().strip('"') for child in children if child.value.strip()}
 
 
 class TgTransformer(Transformer):
