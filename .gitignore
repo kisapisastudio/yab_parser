@@ -1,0 +1,11 @@
+.venv
+Makefile
+.env
+.vscode
+*_cache
+__pycache__
+.python-version
+.DS_Store
+setup.cfg
+test.py
+test/*
