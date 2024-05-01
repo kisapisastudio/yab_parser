@@ -590,6 +590,7 @@ class TgTransformer(Transformer):
                 tg_text_row.append(child.children[0].value)
         soup = BeautifulSoup(''.join(tg_text_row), 'html.parser')
         corrected_tg_text = str(soup)
+        corrected_tg_text = corrected_tg_text.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
         return corrected_tg_text, ''.join(tr_text_row), used_vars
 
     def _parse_text(self, text: str, ident: str, used_vars: set[str]):
