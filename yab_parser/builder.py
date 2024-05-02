@@ -481,8 +481,8 @@ class TgTransformer(Transformer):
             if child.data.value == 'options':
                 self.line(child.children)
                 continue
-            ident = list(child.find_data('line_ident'))
-            ident = ident[0].children[0].value if ident else None
+            ident = [c.children[0] for c in child.children if c.data.value == 'line_ident']
+            ident = ident[0].value if ident else None
             speaker_tree = list(child.find_data('speaker'))
             if speaker_tree:
                 speaker_tree[0].set(
