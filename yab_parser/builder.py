@@ -527,7 +527,7 @@ class TgTransformer(Transformer):
 
     def _make_tg_and_tr_text(self, children, ident=None):
         tg_text, tr_text, used_vars = self._to_tg_text(children, ident)
-        result = [Token(config.SUPPORTED_LANGUAGES[0], tg_text)]
+        result = [Token(config.SUPPORTED_LANGUAGES[0].upper(), tg_text)]
         if ident:
             is_ident_in_translation = self._translation.get(ident)
             if is_ident_in_translation:
@@ -554,6 +554,8 @@ class TgTransformer(Transformer):
                     )
                 self._new_translation[ident] = {config.SUPPORTED_LANGUAGES[0]: tr_text}
                 self._new_translation[ident].update({lang: '' for lang in config.SUPPORTED_LANGUAGES[1:]})
+            elif not is_text_not_empty:
+                result.extend([Token(lang.upper(), '') for lang in config.SUPPORTED_LANGUAGES[1:]])
         return result
 
     def _to_tg_text(self, children, ident=None):
