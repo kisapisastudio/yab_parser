@@ -2,8 +2,6 @@ from lark import Lark, Transformer, Tree, Token, Visitor, exceptions
 from lark.indenter import Indenter
 from lark.visitors import Interpreter
 
-
-import csv
 import re
 import os
 import yaml
@@ -355,7 +353,7 @@ class BranchSerializer(Interpreter):
             if child.data.value == 'media':
                 media = child.children[0].value
             elif child.data.value == 'tg_text':
-                text = {t.type.lower(): t.value for t in child.children}
+                text = child.children
             elif child.data.value == 'speaker':
                 speaker = child.children[0].value
         return media, text, speaker
@@ -377,7 +375,7 @@ class BranchSerializer(Interpreter):
             tree_type = child.data.value if isinstance(child.data, Token) else child.data
             start_link = None
             if tree_type == 'tg_text':
-                text = {t.type.lower(): t.value for t in child.children}
+                text = child.children
             elif tree_type == 'if_statement':
                 condition = child.children[0].value
             elif tree_type == 'branch':
@@ -438,7 +436,7 @@ class TgSerializer(Interpreter):
             if child.data == 'title':
                 self._script.title = child.children[0].value.strip()
             elif child.data == 'checkpoint_name':
-                self._script.checkpoint_name = self._get_translation_text(child.children)
+                self._script.checkpoint_name = child.children[0].value.strip()
             elif child.data == 'start_on_command':
                 self._script.start_on_command = child.children[0].value.strip()
             elif child.data == 'reaction':
@@ -456,48 +454,35 @@ class TgSerializer(Interpreter):
         branch_serializer._postprocess()
         self._script.flow = branch_serializer._flow
 
-    def _get_translation_text(self, children):
-        return {str(child.type).lower(): child.value.strip().strip('"') for child in children if child.value.strip()}
 
 
 class TgTransformer(Transformer):
     def __init__(
         self,
-        translation: dict[str, dict[str, str]],
-        languges: list[str]
     ) -> None:
         super().__init__()
         self._header_params = [
             'title', 'checkpoint_name', 'start_on_command', 'reaction', 'wait', 'time', 'time_for_status'
         ]
-        self._translation = translation
         self.text_parser = self._get_lark_text_parser()
-        self._new_translation = {}
         self._error_rows = []
-        self._languges = languges
 
     def line(self, children):
         for child in children:
             if child.data.value == 'options':
                 self.line(child.children)
                 continue
-            for c in child.children:
-                if isinstance(c.data, Token) and c.data.value == 'line_ident':
-                    ident = c.children[0].value
-                    break
-            else:
-                ident = None
             speaker_tree = list(child.find_data('speaker'))
             if speaker_tree:
                 speaker_tree[0].set(
                     Token('RULE', 'tg_speaker'),
-                    self._make_tg_and_tr_text(speaker_tree[0].children, ident)
+                    self._to_tg_text(speaker_tree[0].children)
                 )
             formated_text_tree = list(child.find_data('formated_text'))
             if formated_text_tree:
                 formated_text_tree[0].set(
                     Token('RULE', 'tg_text'),
-                    self._make_tg_and_tr_text(formated_text_tree[0].children, ident)
+                    self._to_tg_text(formated_text_tree[0].children)
                 )
         return Tree(Token('RULE', 'line'), children)
 
@@ -510,80 +495,26 @@ class TgTransformer(Transformer):
             value = value[0].children[0].value
             if param_name not in self._header_params:
                 continue
-            if param_name == 'checkpoint_name':
-                if self._translation.get(param_name):
-                    self._new_translation[param_name] = self._translation[param_name]
-                else:
-                    self._new_translation[param_name] = {config.SUPPORTED_LANGUAGES[0]: value}
-                    self._new_translation[param_name].update({lang: '' for lang in config.SUPPORTED_LANGUAGES[1:]})
-                cp_children = [Token(config.SUPPORTED_LANGUAGES[0].upper(), value)]
-                for lang in config.SUPPORTED_LANGUAGES[1:]:
-                    if self._new_translation[param_name].get(lang):
-                        cp_children.append(Token(lang.upper(), self._new_translation[param_name][lang]))
-                result.append(Tree(Token('RULE', param_name), cp_children))
-                continue
             result.append(Tree(Token('RULE', param_name), [Token('VALUE', value)]))
         return Tree(Token('RULE', 'header'), result)
 
-    def _make_tg_and_tr_text(self, children, ident=None):
-        tg_text, tr_text, used_vars = self._to_tg_text(children, ident)
-        result = [Token(config.SUPPORTED_LANGUAGES[0].upper(), tg_text)]
-        if ident:
-            is_ident_in_translation = self._translation.get(ident)
-            if is_ident_in_translation:
-                is_base_text_eq_tg_text = self._translation[ident].get(
-                    config.SUPPORTED_LANGUAGES[0]
-                ).strip().lower() == tr_text.strip().lower()
-            else:
-                is_base_text_eq_tg_text = False
-            is_text_not_empty = tg_text.strip()
-            if is_ident_in_translation and is_base_text_eq_tg_text:
-                self._new_translation[ident] = self._translation[ident]
-                for lang in config.SUPPORTED_LANGUAGES[1:]:
-                    if self._translation[ident].get(lang) and self._translation[ident][lang].strip():
-                        tr_tg_text = self._parse_text(
-                            self._new_translation[ident][lang],
-                            ident,
-                            used_vars,
-                        )
-                        result.append(Token(lang.upper(), tr_tg_text))
-            elif is_text_not_empty:
-                if len(self._languges) > 1:
-                    self._error_rows.append(
-                        f'The line {ident} has no translation.'
-                    )
-                self._new_translation[ident] = {config.SUPPORTED_LANGUAGES[0]: tr_text}
-                self._new_translation[ident].update({lang: '' for lang in config.SUPPORTED_LANGUAGES[1:]})
-            elif not is_text_not_empty:
-                result.extend([Token(lang.upper(), '') for lang in config.SUPPORTED_LANGUAGES[1:]])
-        return result
-
-    def _to_tg_text(self, children, ident=None):
+    def _to_tg_text(self, children):
         tg_text_row = []
-        tr_text_row = []
-        used_vars = set()
         for child in children:
             if child.data.value == 'text':
                 tg_text_row.append(child.children[0].value)
-                tr_text_row.append(child.children[0].value)
             elif child.data.value == 'tag':
                 tg_text_row.append(self._add_tg_tag(child.children[0]))
-                tr_text_row.append(self._add_tr_tag(child.children[0]))
             elif child.data.value == 'inline_var':
                 common_var_name = list(child.find_data('common_var_name'))
                 if common_var_name:
                     tg_text_row.append('{' + common_var_name[0].children[0].value + '}')
-                    tr_text_row.append('{' + common_var_name[0].children[0].value + '}')
-                    used_vars.add(common_var_name[0].children[0].value)
                     continue
                 node_var_name = list(child.find_data('node_var_name'))
                 if node_var_name:
                     tg_text_row.append('{' + node_var_name[0].children[0].value + '}')
-                    tr_text_row.append('{' + node_var_name[0].children[0].value + '}')
-                    used_vars.add(node_var_name[0].children[0].value)
                     continue
             elif child.data.value == 'escaped_char':
-                tr_text_row.append('\\' + child.children[0].value)
                 if child.children[0].value in ['{', '}']:
                     tg_text_row.append(child.children[0].value*2)
                     continue
@@ -596,17 +527,7 @@ class TgTransformer(Transformer):
                 tg_text_row.append(child.children[0].value)
         soup = BeautifulSoup(''.join(tg_text_row), 'html.parser')
         corrected_tg_text = str(soup)
-        corrected_tg_text = corrected_tg_text.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
-        return corrected_tg_text, ''.join(tr_text_row), used_vars
-
-    def _parse_text(self, text: str, ident: str, used_vars: set[str]):
-        parsed_text = self.text_parser.parse(text, on_error=self._make_error_parser_func(ident))
-        tg_text, _, used_tr_vars = self._to_tg_text(parsed_text.children)
-        if used_vars != used_tr_vars:
-            self._error_rows.append(
-                f'The translation of the node {ident} uses different variables than the original text.'
-            )
-        return tg_text
+        return corrected_tg_text
 
     def _get_lark_text_parser(self) -> Lark:
         with open(config.LARK_GRAMMAR_PATH, 'r') as f:
@@ -672,56 +593,6 @@ class TgTransformer(Transformer):
             return '</code>'
         elif tag_type == 'close_all_tags':
             return ''
-
-    def _add_tr_tag(self, tag_tree: Tree):
-        tag_type = tag_tree.data.value
-        if tag_type == 'line_break_tag':
-            return '[br/]'
-        elif tag_type == 'open_link_tag':
-            url_tree = list(tag_tree.find_data('url'))
-            if url_tree:
-                common_var_name = list(url_tree[0].find_data('common_var_name'))
-                node_var_name = list(url_tree[0].find_data('node_var_name'))
-                if common_var_name:
-                    url = common_var_name[0].children[0].value
-                elif node_var_name:
-                    url = node_var_name[0].children[0].value
-                else:
-                    url = url_tree[0].children[0].value
-                return f'[link {url}]'
-            return '[link #]'
-        elif tag_type == 'close_link_tag':
-            return '[/link]'
-        elif tag_type == 'colon_tag':
-            return '[cl/]'
-        elif tag_type == 'usd_tag':
-            return '[usd/]'
-        elif tag_type == 'open_bold_tag':
-            return '[b]'
-        elif tag_type == 'close_bold_tag':
-            return '[/b]'
-        elif tag_type == 'open_underline_tag':
-            return '[u]'
-        elif tag_type == 'close_underline_tag':
-            return '[/u]'
-        elif tag_type == 'open_strike_tag':
-            return '[s]'
-        elif tag_type == 'close_strike_tag':
-            return '[/s]'
-        elif tag_type == 'open_italic_tag':
-            return '[i]'
-        elif tag_type == 'close_italic_tag':
-            return '[/i]'
-        elif tag_type == 'open_spoiler_tag':
-            return '[spoiler]'
-        elif tag_type == 'close_spoiler_tag':
-            return '[/spoiler]'
-        elif tag_type == 'open_monospace_tag':
-            return '[ms]'
-        elif tag_type == 'close_monospace_tag':
-            return '[/ms]'
-        elif tag_type == 'close_all_tags':
-            return '[/]'
 
 
 class HeaderVisitor(Visitor):
@@ -940,15 +811,10 @@ class YabScriptBuilder():
             return
         self.parsed_script = self.parser.parse(self.full_script)
         self._check()
-        self.translation = self._get_translation()
         for node in self.sep_nodes:
-            tg_transformer = TgTransformer(
-                self.translation.get(node, {}),
-                self.settings.default_settings.languages.keys()
-            )
+            tg_transformer = TgTransformer()
             self.tg_script[node] = tg_transformer.transform(self.sep_nodes[node])
             self.error_rows += tg_transformer._error_rows
-            self._add_translation_file(node, tg_transformer._new_translation)
         self._serilize_tg_script()
         self._post_process()
 
@@ -1084,36 +950,6 @@ class YabScriptBuilder():
 
             with open(os.path.join(config.MEDIA_PATH, media), 'wb') as f:
                 f.write(media_content)
-
-    def _get_translation(self):
-        result = {}
-        if not os.path.exists(config.TRANSLATION_PATH):
-            os.mkdir(config.TRANSLATION_PATH)
-            return result
-        file_to_delete = set(
-            os.listdir(config.TRANSLATION_PATH)
-        ) - set(
-            [f'{node_name}.csv' for node_name in self.sep_nodes.keys()]
-        )
-        for file in file_to_delete:
-            os.remove(os.path.join(config.TRANSLATION_PATH, file))
-        for file in os.listdir(config.TRANSLATION_PATH):
-            with open(os.path.join(config.TRANSLATION_PATH, file), 'r') as f:
-                reader = csv.DictReader(f)
-                result[file.split('.')[-2]] = {
-                    row['ident']: {k: v for k, v in row.items() if k != 'ident'} for row in reader
-                }
-        return result
-
-    def _add_translation_file(self, node_name: str, translation: dict[str, dict[str, str]]):
-        with open(os.path.join(config.TRANSLATION_PATH, f'{node_name}.csv'), 'w') as f:
-            writer = csv.DictWriter(f, fieldnames=['ident']+config.SUPPORTED_LANGUAGES)
-            writer.writeheader()
-            for ident in translation:
-                row = {'ident': ident}
-                for lang in translation[ident]:
-                    row[lang] = translation[ident][lang]
-                writer.writerow(row)
 
     def _serilize_tg_script(self):
         self.seriliazed_tg_script = schemas.script.Script(

@@ -33,3 +33,9 @@ BUILD_PATH = 'build.yab'
 BUILD_INFO_PATH = 'build_info.json'
 
 SUPPORTED_LANGUAGES = ['ru', 'en']
+
+BABEL_CFG = '''[extractors]
+yab = yab_parser.babel_extractors:extract_yab_json
+
+[yab: **/script.json]
+'''
