@@ -436,7 +436,7 @@ class TgSerializer(Interpreter):
             if child.data == 'title':
                 self._script.title = child.children[0].value.strip()
             elif child.data == 'checkpoint_name':
-                self._script.checkpoint_name = child.children[0].value.strip()
+                self._script.checkpoint_name = child.children[0].value.strip().strip('"')
             elif child.data == 'start_on_command':
                 self._script.start_on_command = child.children[0].value.strip()
             elif child.data == 'reaction':
