@@ -94,24 +94,22 @@ class Command(BaseModel):
 
 
 class Option(BaseModel):
-    text: dict[str, str]
+    text: str
     condition: Condition | None = None
     link: str | None = None
 
     @field_validator('text')
     @classmethod
     def remove_empty_text(cls, v):
-        for key, value in v.items():
-            v[key] = value.strip()
-        return v
+        return v.strip()
 
 
 class Message(BaseModel):
     message_type: MessageType
-    speaker: dict[str, str] | None = None
+    speaker: str | None = None
     options: list[Option] = []
     media: str | None = None
-    text: dict[str, str] | None = None
+    text: str | None = None
     next_line_id: str | None = None
 
     @field_validator('text', 'speaker')
@@ -119,9 +117,7 @@ class Message(BaseModel):
     def remove_empty_text(cls, v):
         if v is None:
             return v
-        for key, value in v.items():
-            v[key] = value.strip()
-        return v
+        return v.strip()
 
 
 class VariableCommand(BaseModel):
@@ -168,7 +164,7 @@ class FlowControl(BaseModel):
 
 class Node(BaseModel):
     title: str | None = None
-    checkpoint_name: dict[str, str] | None = None
+    checkpoint_name: str | None = None
     reaction: str | None = None
     wait: float | None = None
     time_for_status: float | None = None
