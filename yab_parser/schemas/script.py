@@ -55,9 +55,9 @@ class Var(BaseModel):
 
 class Condition(BaseModel):
     cond_type: ConditionType
-    value: list[Union['Expression', 'Condition', Var, bool, int, float]] = []
+    value: list[Union['Expression', 'Condition', Var, int, float, bool]] = []
 
-    @field_validator('value')
+    @field_validator('value', mode='before')
     @classmethod
     def get_value(cls, v):
         result = []
