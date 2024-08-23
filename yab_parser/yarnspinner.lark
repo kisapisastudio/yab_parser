@@ -41,9 +41,7 @@ typing: _TYPING_COMMAND
 upload_photo: _UPLOAD_PHOTO_COMMAND
 record_voice: _RECORD_VOICE_COMMAND
 record_video_note: _RECORD_VIDEO_NOTE_COMMAND
-?var_name: common_var_name | node_var_name
-common_var_name: VAR_NAME
-node_var_name: NODE_VAR_NAME
+var_name: VAR_NAME
 
 // var command elements
 set_var: _SET_COMMAND var_name "=" (value|calculate)
@@ -166,7 +164,6 @@ _SPEAKER_SEPARATOR: ":"
 _HEARER_SEPARATOR: ":"
 TEXT: /[^$\[\]\r\n\t{}<>\/#\\]+/
 NORMALIZED_NAME: /\w+/
-NODE_VAR_NAME: /\$__\w+/
 ANY_CHAR:  /./
 _ESC_SYMBOL: "\\"
 

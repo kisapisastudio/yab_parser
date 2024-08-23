@@ -56,10 +56,7 @@ class ExpressionSerializer(Transformer):
             return int(children[0].value)
         return float(children[0].value)
 
-    def common_var_name(self, children):
-        return schemas.script.Var(name=children[0].value)
-
-    def node_var_name(self, children):
+    def var_name(self, children):
         return schemas.script.Var(name=children[0].value)
 
 
@@ -266,14 +263,8 @@ class BranchSerializer(Interpreter):
         return command
 
     def _get_var_command(self, child):
-        node_var_name = list(child.find_data('node_var_name'))
-        if node_var_name:
-            var_name = node_var_name[0].children[0].value
-            is_temporary = True
-        else:
-            var_name = list(child.find_data('common_var_name'))
-            var_name = var_name[0].children[0].value
-            is_temporary = False
+        var_name = list(child.find_data('var_name'))
+        var_name = var_name[0].children[0].value
 
         value = list(child.find_data('value'))
         value = value[0].children[0].children[0].value if value else None
@@ -289,7 +280,6 @@ class BranchSerializer(Interpreter):
                 name=var_name,
                 value=value,
                 calculation=calculation,
-                is_temporary=is_temporary
             )
         elif child.data.value == 'declare_var':
             var_command = schemas.script.VariableCommand(
@@ -297,7 +287,6 @@ class BranchSerializer(Interpreter):
                 name=var_name,
                 value=value,
                 calculation=calculation,
-                is_temporary=is_temporary
             )
         return var_command
 
@@ -506,14 +495,9 @@ class TgTransformer(Transformer):
             elif child.data.value == 'tag':
                 tg_text_row.append(self._add_tg_tag(child.children[0]))
             elif child.data.value == 'inline_var':
-                common_var_name = list(child.find_data('common_var_name'))
-                if common_var_name:
-                    tg_text_row.append('{' + common_var_name[0].children[0].value + '}')
-                    continue
-                node_var_name = list(child.find_data('node_var_name'))
-                if node_var_name:
-                    tg_text_row.append('{' + node_var_name[0].children[0].value + '}')
-                    continue
+                var_name = list(child.find_data('var_name'))
+                tg_text_row.append('{' + var_name[0].children[0].value + '}')
+                continue
             elif child.data.value == 'escaped_char':
                 if child.children[0].value in ['{', '}']:
                     tg_text_row.append(child.children[0].value*2)
@@ -551,12 +535,9 @@ class TgTransformer(Transformer):
         elif tag_type == 'open_link_tag':
             url_tree = list(tag_tree.find_data('url'))
             if url_tree:
-                common_var_name = list(url_tree[0].find_data('common_var_name'))
-                node_var_name = list(url_tree[0].find_data('node_var_name'))
-                if common_var_name:
-                    url = '{' + common_var_name[0].children[0].value + '}'
-                elif node_var_name:
-                    url = '{' + node_var_name[0].children[0].value + '}'
+                var_name = list(url_tree[0].find_data('var_name'))
+                if var_name:
+                    url = '{' + var_name[0].children[0].value + '}'
                 else:
                     url = url_tree[0].children[0].value
                 return f'<a href="{url}">'
@@ -647,40 +628,20 @@ class FlowVisitor(Visitor):
             self.node_links.add(node_name.value)
 
     def inline_var(self, tree: Tree):
-        common_var_name = list(tree.find_data('common_var_name'))
-        if common_var_name:
-            var_name = common_var_name[0].children[0]
-            self.used_vars.add(var_name.value)
-            return
-        node_var_name = list(tree.find_data('node_var_name'))
-        if node_var_name:
-            var_name = node_var_name[0].children[0]
-            self.used_vars_in_node.add(var_name.value)
-            return
+        var_name = list(tree.find_data('var_name'))
+        var_name = var_name[0].children[0]
+        self.used_vars.add(var_name.value)
+        return
 
     def set_var(self, tree: Tree):
-        common_var_name = list(tree.find_data('common_var_name'))
-        if common_var_name:
-            var_name = common_var_name[0].children[0]
-            self.used_vars.add(var_name.value)
-            return
-        node_var_name = list(tree.find_data('node_var_name'))
-        if node_var_name:
-            var_name = node_var_name[0].children[0]
-            self.used_vars_in_node.add(var_name.value)
-            return
+        var_name = list(tree.find_data('var_name'))
+        var_name = var_name[0].children[0]
+        self.used_vars.add(var_name.value)
 
     def declare_var(self, tree: Tree):
-        common_var_name = list(tree.find_data('common_var_name'))
-        if common_var_name:
-            var_name = common_var_name[0].children[0]
-            self.declared_vars.add(var_name.value)
-            return
-        node_var_name = list(tree.find_data('node_var_name'))
-        if node_var_name:
-            var_name = node_var_name[0].children[0]
-            self.declared_vars_in_node.add(var_name.value)
-            return
+        var_name = list(tree.find_data('var_name'))
+        var_name = var_name[0].children[0]
+        self.declared_vars.add(var_name.value)
 
     def media(self, tree: Tree):
         media_name = tree.children[0]

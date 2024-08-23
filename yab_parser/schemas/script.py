@@ -125,7 +125,6 @@ class VariableCommand(BaseModel):
     name: str
     value: bool | int | float | str | None = None
     calculation: Expression | None = None
-    is_temporary: bool = False
     next_line_id: str | None = None
 
     @field_validator('value')
